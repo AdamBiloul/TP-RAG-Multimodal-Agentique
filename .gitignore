@@ -1,0 +1,54 @@
+# Python et environnements
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+ENV/
+.python-version
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# Jupyter
+.ipynb_checkpoints/
+.jupyter/
+# Données et résultats générés
+/data/
+/MNIST/
+*.pt
+*.pth
+/graphe_operations.png
+/sauvegardes/
+# Secrets et fichiers locaux
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Fichiers temporaires et macOS
+.DS_Store
+._*
+.Spotlight-V100/
+.Trashes/
+*.log
+*.tmp
+*.bak
+*~
+# Documents locaux, extractions et index
+pdfs/
+*.pdf
+architecture_transformer.png
+resultats_pdf/
+chroma_pdf/
+uploads/
+.cache/
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+requirements-lock.txt
