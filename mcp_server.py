@@ -18,5 +18,15 @@ def consulter_pdf(question: str, type_resultat: Literal['tous', 'texte', 'image'
     return json.dumps(resultat, ensure_ascii=False)
 
 
+@mcp.tool(name='retriever_tool')
+def rechercher_sources(texte: str | None = None, image_id: str | None = None,
+                       type_resultat: Literal['tous', 'texte', 'image'] = 'tous', k: int = 6) -> str:
+    """Récupérer les sources brutes par texte OU identifiant image, sans génération LLM."""
+    with contextlib.redirect_stdout(sys.stderr):
+        from retriever_tool import retrouver
+        resultat = retrouver(texte, image_id, type_resultat, k)
+    return json.dumps(resultat, ensure_ascii=False)
+
+
 if __name__ == '__main__':
     mcp.run(transport='stdio')

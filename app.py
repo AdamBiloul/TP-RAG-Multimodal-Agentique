@@ -8,18 +8,18 @@ from settings import ROOT
 st.set_page_config(page_title='RAG multimodal', page_icon='📚', layout='wide')
 st.title('RAG multimodal documentaire')
 st.write('Interrogez Attention Is All You Need et retrouvez les passages et figures utilisés.')
-mode = st.sidebar.radio('Mode', ['RAG direct', 'Agent LangChain', 'Agent via MCP'])
+mode = st.sidebar.radio('Mode', ['RAG direct', 'Agent ReAct LangGraph', 'Agent LangChain', 'Agent via MCP'])
 type_resultat = st.sidebar.selectbox('Sources recherchées', ['tous', 'texte', 'image'])
 k = st.sidebar.slider('Nombre de sources', 1, 12, 6)
 question = st.text_area('Votre question', 'Pourquoi le Transformer utilise-t-il plusieurs têtes d’attention ?')
-image = st.file_uploader('Image de recherche (mode RAG direct)', type=['png', 'jpg', 'jpeg', 'webp'])
-if mode != 'RAG direct' and image is not None:
-    st.info('Choisissez RAG direct pour utiliser cette image comme requête.')
+image = st.file_uploader('Image de recherche (RAG direct ou ReAct)', type=['png', 'jpg', 'jpeg', 'webp'])
+if mode not in {'RAG direct', 'Agent ReAct LangGraph'} and image is not None:
+    st.info('Choisissez RAG direct ou Agent ReAct LangGraph pour utiliser cette image.')
 
 if st.button('Rechercher', type='primary'):
     if not question.strip():
         st.warning('Saisissez une question.')
-    elif mode != 'RAG direct' and image is not None:
+    elif mode not in {'RAG direct', 'Agent ReAct LangGraph'} and image is not None:
         st.warning('Ce mode attend une question textuelle. Retirez l’image ou choisissez RAG direct.')
     else:
         try:
@@ -41,6 +41,27 @@ if st.button('Rechercher', type='primary'):
                                 st.image(str(chemin), caption=f"{source['pdf']}, page {source['page']}")
                     for message in resultat['avertissements']:
                         st.warning(message)
+                elif mode == 'Agent ReAct LangGraph':
+                    from agent_react import interroger_react
+                    with tempfile.TemporaryDirectory(prefix='react-requete-') as dossier:
+                        chemin = None
+                        if image is not None:
+                            chemin = Path(dossier) / 'requete.png'
+                            chemin.write_bytes(image.getvalue())
+                        resultat = interroger_react(question, chemin)
+                    st.markdown(resultat['reponse'])
+                    from rag_core import image_source
+                    images_vues = set()
+                    for etape in resultat['trace']:
+                        if etape['etape'] == 'Observation':
+                            for source in etape['resultat'].get('sources', []):
+                                if source['type'] == 'image' and source['id'] not in images_vues:
+                                    images_vues.add(source['id'])
+                                    chemin = image_source(source['id'])
+                                    if chemin:
+                                        st.image(str(chemin), caption=f"{source['pdf']}, page {source['page']}")
+                    with st.expander('Trace Action → Observation → Réponse finale', expanded=True):
+                        st.json(resultat['trace'])
                 else:
                     demande = f'{question}\nTypes de sources : {type_resultat}. Nombre de sources : {k}.'
                     if mode == 'Agent via MCP':

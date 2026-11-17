@@ -110,6 +110,8 @@ python agent_mcp.py "Pourquoi utiliser plusieurs têtes d’attention ?"
 | `rag_core.py` | Extraction, indexation, recherche et génération partagées |
 | `settings.py` | Configuration du fournisseur LLM |
 | `app.py` | Interface Streamlit |
+| `agent_react.py` | Graphe explicite MIND/BODY, requêtes multimodales et trace ReAct |
+| `retriever_tool.py` | Outil de recherche brute texte ou image, sans génération |
 | `agent_local.py` | Agent avec accès direct au RAG |
 | `mcp_server.py` | Serveur documentaire MCP |
 | `agent_mcp.py` | Agent client MCP |
@@ -135,7 +137,7 @@ Les PDF scannés demandent un OCR supplémentaire. Changer de modèle CLIP ou de
 - [Qwen3-VL dans Ollama](https://ollama.com/library/qwen3-vl)
 - [SDK Python MCP](https://github.com/modelcontextprotocol/python-sdk)
 
-## Résultats de la validation
+## Résultats de la validation initiale
 
 - 50 cellules de code exécutées dans l’ordre, sans erreur, avec Qwen3-VL 4B Instruct local et un contexte de 8 192 tokens.
 - 216 fragments de texte et 14 images/rendus indexés ; recherche de la figure 2 restreinte à sa page de légende, page 4.
@@ -146,3 +148,34 @@ Les PDF scannés demandent un OCR supplémentaire. Changer de modèle CLIP ou de
 **Limites observées :** certaines générations du modèle 4B se contredisent sur les paramètres du modèle, confondent le rôle de Q/K/V ou inventent une figure 3. Le notebook contient un corrigé documentaire vérifié et une analyse explicite de ces erreurs. Les sorties originales du LLM sont conservées comme résultats expérimentaux ; elles ne doivent pas être prises pour le corrigé. Les illustrations et citations ne valident pas automatiquement une affirmation.
 
 Les 121 cellules du document initial sont conservées dans leur ordre. Les compléments et le corrigé sont ajoutés à la fin. Les chemins locaux des avertissements ont été anonymisés avant publication.
+
+## Correspondance avec les sept étapes de l’énoncé
+
+| Étape | Code et résultat |
+| --- | --- |
+| 1 — Extraction multimodale | `rag_core.py` : texte intégral et par page, chunks, extraction des images et rendu des pages vectorielles |
+| 2 — Espace latent commun | CLIP ViT-B-32, embeddings texte/image de 512 dimensions normalisés |
+| 3 — Stockage | ChromaDB persistant, distance cosinus, empreinte SHA-256, métadonnées type/PDF/page/source et réindexation |
+| 4 — Retrieval | `retriever_tool.retrouver` accepte un texte **ou** une image connue, renvoie k sources brutes et leurs scores |
+| 5 — Outil agentique | `retriever_tool` : schéma typé, description et paramètres de modalité ; aucune génération LLM imbriquée |
+| 6 — ReAct / LangGraph | `agent_react.py` : `StateGraph(MessagesState)` composé puis compilé ; MIND = LLM, BODY = ToolNode |
+| 7 — Validation | Deux cas réels dans le complément final du notebook ; trace Action → Observation → Réponse finale et tests de contrôle du graphe |
+
+### Exécuter le graphe ReAct explicite
+
+```bash
+python agent_react.py "Pourquoi utiliser plusieurs têtes d’attention ?"
+python agent_react.py "Compare cette architecture à la Figure 1 du PDF et explique le décodeur avec les textes et les images retrouvés." --image architecture_transformer.png
+```
+
+Le modèle choisit les arguments de `retriever_tool`. Pour une demande texte + image, il doit effectuer deux recherches distinctes et confronter les observations. Les images d’entrée sont enregistrées sous identifiant SHA-256 dans `uploads/`, ignoré par Git ; l’outil ne reçoit aucun chemin arbitraire. Les images issues des observations sont transmises au modèle (trois au maximum, redimensionnées pour limiter le contexte), en plus des textes et des légendes.
+
+Le graphe suit `START → MIND → BODY → MIND → … → END`. Le nœud MIND choisit une action ou une conclusion. BODY exécute les appels et ajoute les observations. Une conclusion sans appel documentaire et un quatrième appel sont refusés. La trace associe les actions et observations par identifiant d’appel ; elle n’expose pas le raisonnement interne du modèle.
+
+Dans Streamlit, choisissez **Agent ReAct LangGraph** pour utiliser ce graphe, une image éventuelle et les aperçus des figures récupérées. Les modes précédents restent disponibles. Le serveur MCP expose maintenant les deux outils : `consulter_pdf` (RAG complet) et `retriever_tool` (récupération brute).
+
+Les 16 tests automatisés couvrent notamment le cycle complet du graphe, la nécessité d’une recherche avant conclusion, la borne de trois appels et la validation des identifiants d’images. Les deux cellules de code du nouveau complément sont autonomes et vérifiées séparément des 50 cellules initialement exécutées. Le corrigé de référence et les limites factuelles du LLM restent applicables.
+
+Référence : [construction explicite d’un agent avec LangGraph](https://docs.langchain.com/oss/python/langgraph/quickstart).
+
+Validation du complément : deux appels documentaires dans chacun des deux cas exécutés ; le cas texte + image récupère des textes et des images. Les vecteurs texte et image contrôlés ont 512 composantes et une norme de 1. Le schéma MCP expose bien les deux outils.

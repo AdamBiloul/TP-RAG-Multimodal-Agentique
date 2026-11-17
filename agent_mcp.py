@@ -34,7 +34,7 @@ async def interroger_agent_mcp(question):
 
 async def verifier_mcp():
     tools = await client_mcp().get_tools()
-    assert any(t.name == 'consulter_pdf' for t in tools)
+    assert {'consulter_pdf', 'retriever_tool'} <= {t.name for t in tools}
     print('Connexion MCP réussie :', ', '.join(t.name for t in tools))
 
 
